@@ -4,11 +4,25 @@
 <meta charset="UTF-8">
 <title>Rahul Notes CMS PRO</title>
 
+<!-- GrapesJS -->
 <link href="https://unpkg.com/grapesjs/dist/css/grapes.min.css" rel="stylesheet"/>
 <script src="https://unpkg.com/grapesjs"></script>
 
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
 <style>
-body { margin:0; font-family:Arial; }
+body {
+  margin:0;
+  font-family:Arial;
+  background:#ffffff;
+}
+
+body.dark {
+  background:#111827;
+  color:white;
+}
+
 .topbar {
   background:#111827;
   color:white;
@@ -17,19 +31,28 @@ body { margin:0; font-family:Arial; }
   justify-content:space-between;
   align-items:center;
 }
+
 .sidebar {
-  width:200px;
+  width:220px;
   background:#1f2937;
   color:white;
   height:90vh;
   overflow:auto;
   float:left;
+  padding:10px;
 }
+
 .sidebar h3 {
   text-align:center;
 }
-.sidebar button {
+
+.sidebar button,
+.sidebar input {
   width:100%;
+  margin-bottom:6px;
+}
+
+.sidebar button {
   padding:8px;
   background:none;
   color:white;
@@ -37,15 +60,14 @@ body { margin:0; font-family:Arial; }
   text-align:left;
   cursor:pointer;
 }
+
 .sidebar button:hover {
   background:#374151;
 }
+
 .editor-area {
-  margin-left:200px;
+  margin-left:220px;
   height:90vh;
-}
-.dark body {
-  background:#111827;
 }
 </style>
 </head>
@@ -54,7 +76,7 @@ body { margin:0; font-family:Arial; }
 
 <div class="topbar">
   <div>
-    <img src="" id="logoPreview" style="height:30px;vertical-align:middle;">
+    <img src="" id="logoPreview" style="height:30px;vertical-align:middle;margin-right:10px;">
     Rahul Notes CMS PRO
   </div>
   <div>
@@ -68,8 +90,15 @@ body { margin:0; font-family:Arial; }
   <h3>Pages</h3>
   <div id="pageList"></div>
   <button onclick="addPage()">+ Add Page</button>
+
   <hr>
+
   <input type="file" onchange="uploadLogo(event)">
+
+  <hr>
+
+  <input type="file" id="pdfUpload" accept="application/pdf">
+  <button onclick="extractPDF()">Extract PDF</button>
 </div>
 
 <div class="editor-area">
@@ -77,8 +106,19 @@ body { margin:0; font-family:Arial; }
 </div>
 
 <script>
-let pages = {};
-let currentPage = "home";
+
+/* =========================
+   INITIAL STATE
+========================= */
+
+let pages = JSON.parse(localStorage.getItem("rahulCMS")) || {};
+let currentPage = Object.keys(pages)[0] || "home";
+
+if(!pages[currentPage]) pages[currentPage] = null;
+
+/* =========================
+   INIT GRAPESJS
+========================= */
 
 const editor = grapesjs.init({
   container:'#gjs',
@@ -86,32 +126,23 @@ const editor = grapesjs.init({
   storageManager:false
 });
 
-/* Navbar Block */
+/* =========================
+   BLOCKS
+========================= */
 
 editor.BlockManager.add('navbar',{
-label:'Navbar',
-content:`<nav id="autoNav" style="padding:15px;background:#111827;color:white;"></nav>`
+  label:'Navbar',
+  content:`<nav id="autoNav" style="padding:15px;background:#111827;color:white;"></nav>`
 });
-
-/* Image Block */
 
 editor.BlockManager.add('image',{
-label:'Image',
-content:`<img src="https://via.placeholder.com/300" style="max-width:100%;">`
+  label:'Image',
+  content:`<img src="https://via.placeholder.com/300" style="max-width:100%;">`
 });
 
-/* Add Page */
-
-function addPage(){
-  const name = prompt("Page Name:");
-  if(!name) return;
-  pages[name] = null;
-  currentPage = name;
-  editor.setComponents(`<h1 style="padding:40px;">${name}</h1>`);
-  renderPages();
-}
-
-/* Render Sidebar */
+/* =========================
+   PAGE SYSTEM
+========================= */
 
 function renderPages(){
   const list = document.getElementById("pageList");
@@ -125,11 +156,23 @@ function renderPages(){
   updateNavbar();
 }
 
-/* Switch Page */
+function addPage(){
+  const name = prompt("Page Name:");
+  if(!name) return;
+
+  saveCurrent();
+  pages[name] = null;
+  currentPage = name;
+
+  editor.setComponents(`<h1 style="padding:40px;">${name}</h1>`);
+  saveCurrent();
+  renderPages();
+}
 
 function switchPage(name){
   saveCurrent();
   currentPage=name;
+
   if(pages[name]){
     editor.loadProjectData(pages[name]);
   } else {
@@ -137,35 +180,47 @@ function switchPage(name){
   }
 }
 
-/* Save */
-
 function saveCurrent(){
   pages[currentPage]=editor.getProjectData();
+  localStorage.setItem("rahulCMS", JSON.stringify(pages));
 }
 
-/* Auto Navbar */
+/* =========================
+   NAVBAR AUTO UPDATE
+========================= */
 
 function updateNavbar(){
-  const navLinks = Object.keys(pages)
-  .map(p=>`<a href="${p}.html" style="margin-right:15px;color:white;">${p}</a>`)
-  .join("");
-  const nav = editor.Canvas.getDocument().getElementById("autoNav");
-  if(nav) nav.innerHTML = navLinks;
+  const navComponent = editor.getWrapper().find('#autoNav')[0];
+
+  if(navComponent){
+    const links = Object.keys(pages)
+      .map(p=>`<a href="${p}.html" style="margin-right:15px;color:white;">${p}</a>`)
+      .join("");
+
+    navComponent.components(links);
+  }
 }
 
-/* Dark Mode */
+/* =========================
+   DARK MODE
+========================= */
 
 function toggleDark(){
   document.body.classList.toggle("dark");
 }
 
-/* Theme Color */
+/* =========================
+   THEME COLOR
+========================= */
 
-document.getElementById("themeColor").addEventListener("input",e=>{
+document.getElementById("themeColor")
+.addEventListener("input",e=>{
   document.querySelector(".topbar").style.background=e.target.value;
 });
 
-/* Logo Upload */
+/* =========================
+   LOGO UPLOAD
+========================= */
 
 function uploadLogo(e){
   const reader = new FileReader();
@@ -175,14 +230,76 @@ function uploadLogo(e){
   reader.readAsDataURL(e.target.files[0]);
 }
 
-/* Export */
+/* =========================
+   PDF EXTRACTOR
+========================= */
+
+async function extractPDF() {
+
+  const fileInput = document.getElementById('pdfUpload');
+  const file = fileInput.files[0];
+
+  if (!file) {
+    alert("Please upload a PDF first.");
+    return;
+  }
+
+  alert("Extracting PDF... please wait.");
+
+  const reader = new FileReader();
+
+  reader.onload = async function() {
+    try {
+      const typedarray = new Uint8Array(this.result);
+      const pdf = await pdfjsLib.getDocument(typedarray).promise;
+
+      let fullText = "";
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const strings = content.items.map(item => item.str);
+        fullText += strings.join(" ") + "\n\n";
+      }
+
+      saveCurrent();
+
+      editor.addComponents(`
+        <section style="padding:40px;background:#f9fafb;">
+          <h2>Extracted PDF Content</h2>
+          <p>${fullText.replace(/\n/g, "<br>")}</p>
+        </section>
+      `);
+
+      saveCurrent();
+
+    } catch(err){
+      alert("Error reading PDF.");
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+/* =========================
+   EXPORT PAGE
+========================= */
 
 function exportPage(){
   saveCurrent();
-  const data = pages[currentPage];
+
   const html = editor.getHtml();
   const css = editor.getCss();
-  const full = `<html><head><style>${css}</style></head><body>${html}</body></html>`;
+
+  const full = `
+  <html>
+  <head>
+  <meta charset="UTF-8">
+  <style>${css}</style>
+  </head>
+  <body>${html}</body>
+  </html>`;
+
   const blob=new Blob([full],{type:"text/html"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
@@ -190,9 +307,13 @@ function exportPage(){
   a.click();
 }
 
-/* Init */
-pages["home"]=null;
+/* =========================
+   INIT LOAD
+========================= */
+
 renderPages();
+switchPage(currentPage);
+
 </script>
 
 </body>
