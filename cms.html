@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rahul Notes CMS PRO</title>
+
+<link href="https://unpkg.com/grapesjs/dist/css/grapes.min.css" rel="stylesheet"/>
+<script src="https://unpkg.com/grapesjs"></script>
+
+<style>
+body { margin:0; font-family:Arial; }
+.topbar {
+  background:#111827;
+  color:white;
+  padding:10px 20px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.sidebar {
+  width:200px;
+  background:#1f2937;
+  color:white;
+  height:90vh;
+  overflow:auto;
+  float:left;
+}
+.sidebar h3 {
+  text-align:center;
+}
+.sidebar button {
+  width:100%;
+  padding:8px;
+  background:none;
+  color:white;
+  border:none;
+  text-align:left;
+  cursor:pointer;
+}
+.sidebar button:hover {
+  background:#374151;
+}
+.editor-area {
+  margin-left:200px;
+  height:90vh;
+}
+.dark body {
+  background:#111827;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div>
+    <img src="" id="logoPreview" style="height:30px;vertical-align:middle;">
+    Rahul Notes CMS PRO
+  </div>
+  <div>
+    <input type="color" id="themeColor">
+    <button onclick="toggleDark()">Dark Mode</button>
+    <button onclick="exportPage()">Export</button>
+  </div>
+</div>
+
+<div class="sidebar">
+  <h3>Pages</h3>
+  <div id="pageList"></div>
+  <button onclick="addPage()">+ Add Page</button>
+  <hr>
+  <input type="file" onchange="uploadLogo(event)">
+</div>
+
+<div class="editor-area">
+  <div id="gjs"></div>
+</div>
+
+<script>
+let pages = {};
+let currentPage = "home";
+
+const editor = grapesjs.init({
+  container:'#gjs',
+  height:'100%',
+  storageManager:false
+});
+
+/* Navbar Block */
+
+editor.BlockManager.add('navbar',{
+label:'Navbar',
+content:`<nav id="autoNav" style="padding:15px;background:#111827;color:white;"></nav>`
+});
+
+/* Image Block */
+
+editor.BlockManager.add('image',{
+label:'Image',
+content:`<img src="https://via.placeholder.com/300" style="max-width:100%;">`
+});
+
+/* Add Page */
+
+function addPage(){
+  const name = prompt("Page Name:");
+  if(!name) return;
+  pages[name] = null;
+  currentPage = name;
+  editor.setComponents(`<h1 style="padding:40px;">${name}</h1>`);
+  renderPages();
+}
+
+/* Render Sidebar */
+
+function renderPages(){
+  const list = document.getElementById("pageList");
+  list.innerHTML="";
+  Object.keys(pages).forEach(p=>{
+    const btn=document.createElement("button");
+    btn.innerText=p;
+    btn.onclick=()=>switchPage(p);
+    list.appendChild(btn);
+  });
+  updateNavbar();
+}
+
+/* Switch Page */
+
+function switchPage(name){
+  saveCurrent();
+  currentPage=name;
+  if(pages[name]){
+    editor.loadProjectData(pages[name]);
+  } else {
+    editor.setComponents(`<h1 style="padding:40px;">${name}</h1>`);
+  }
+}
+
+/* Save */
+
+function saveCurrent(){
+  pages[currentPage]=editor.getProjectData();
+}
+
+/* Auto Navbar */
+
+function updateNavbar(){
+  const navLinks = Object.keys(pages)
+  .map(p=>`<a href="${p}.html" style="margin-right:15px;color:white;">${p}</a>`)
+  .join("");
+  const nav = editor.Canvas.getDocument().getElementById("autoNav");
+  if(nav) nav.innerHTML = navLinks;
+}
+
+/* Dark Mode */
+
+function toggleDark(){
+  document.body.classList.toggle("dark");
+}
+
+/* Theme Color */
+
+document.getElementById("themeColor").addEventListener("input",e=>{
+  document.querySelector(".topbar").style.background=e.target.value;
+});
+
+/* Logo Upload */
+
+function uploadLogo(e){
+  const reader = new FileReader();
+  reader.onload=function(){
+    document.getElementById("logoPreview").src=reader.result;
+  }
+  reader.readAsDataURL(e.target.files[0]);
+}
+
+/* Export */
+
+function exportPage(){
+  saveCurrent();
+  const data = pages[currentPage];
+  const html = editor.getHtml();
+  const css = editor.getCss();
+  const full = `<html><head><style>${css}</style></head><body>${html}</body></html>`;
+  const blob=new Blob([full],{type:"text/html"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=currentPage+".html";
+  a.click();
+}
+
+/* Init */
+pages["home"]=null;
+renderPages();
+</script>
+
+</body>
+</html>
