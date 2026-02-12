@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rahul Offline Editor v3</title>
+
+<style>
+body{margin:0;font-family:system-ui;background:#f4f4f4;}
+.topbar{
+  height:60px;background:white;border-bottom:1px solid #ddd;
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+}
+.topbar input{font-size:18px;border:none;outline:none;width:300px;}
+.topbar button{padding:6px 12px;cursor:pointer;}
+
+.layout{display:flex;height:calc(100vh - 60px);}
+
+.sidebar{
+  width:200px;background:white;border-right:1px solid #ddd;padding:10px;
+}
+
+.sidebar button{width:100%;margin-bottom:8px;padding:8px;}
+
+.canvas{flex:1;padding:50px;overflow:auto;}
+
+.block{
+  background:white;padding:10px;margin-bottom:10px;
+  border:1px solid transparent;position:relative;
+}
+
+.block.selected{border:1px solid #0073aa;}
+
+/* Toolbar */
+.block-toolbar{
+  position:absolute;top:-28px;right:0;
+  background:#111;color:white;padding:4px 6px;
+  border-radius:4px;display:none;
+}
+.block.selected .block-toolbar{display:block;}
+.block-toolbar button{
+  background:none;border:none;color:white;
+  cursor:pointer;margin:0 4px;
+}
+
+/* Floating text toolbar */
+.text-toolbar{
+  position:absolute;
+  background:#111;color:white;
+  padding:6px;border-radius:4px;
+  display:none;
+}
+.text-toolbar button{
+  background:none;border:none;color:white;margin:0 4px;
+  cursor:pointer;
+}
+
+/* Slash menu */
+.slash-menu{
+  position:absolute;
+  background:white;border:1px solid #ddd;
+  display:none;padding:5px;
+}
+.slash-menu div{
+  padding:5px;cursor:pointer;
+}
+.slash-menu div:hover{background:#eee;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <input id="docTitle" placeholder="Document Title">
+  <div>
+    <button onclick="downloadHTML()">Save as HTML</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <button onclick="editor.addBlock('paragraph')">+ Paragraph</button>
+    <button onclick="editor.addBlock('heading')">+ Heading</button>
+  </div>
+
+  <div class="canvas" id="canvas"></div>
+</div>
+
+<div class="text-toolbar" id="textToolbar">
+  <button onclick="format('bold')">B</button>
+  <button onclick="format('italic')">I</button>
+</div>
+
+<div class="slash-menu" id="slashMenu">
+  <div onclick="editor.addBlock('heading')">Heading</div>
+  <div onclick="editor.addBlock('paragraph')">Paragraph</div>
+</div>
+
+<script>
+
+/* ================= BLOCK REGISTRY ================= */
+
+const BlockRegistry = {
+
+  paragraph:{
+    create(data={}){
+      return {type:"paragraph",content:data.content||"New paragraph..."};
+    },
+    render(block,index){
+      return `
+      <div class="block" draggable="true" data-index="${index}">
+        <div class="block-toolbar">
+          <button onclick="editor.switchType(${index})">⇄</button>
+          <button onclick="editor.duplicate(${index})">⧉</button>
+          <button onclick="editor.deleteBlock(${index})">✕</button>
+        </div>
+        <p contenteditable="true">${block.content}</p>
+      </div>`;
+    }
+  },
+
+  heading:{
+    create(data={}){
+      return {type:"heading",level:2,content:data.content||"Heading"};
+    },
+    render(block,index){
+      return `
+      <div class="block" draggable="true" data-index="${index}">
+        <div class="block-toolbar">
+          <button onclick="editor.switchType(${index})">⇄</button>
+          <button onclick="editor.duplicate(${index})">⧉</button>
+          <button onclick="editor.deleteBlock(${index})">✕</button>
+        </div>
+        <h2 contenteditable="true">${block.content}</h2>
+      </div>`;
+    }
+  }
+
+};
+
+/* ================= EDITOR ENGINE ================= */
+
+class Editor{
+  constructor(){
+    this.blocks=[];
+    this.loadAuto();
+  }
+
+  autoSave(){
+    localStorage.setItem("rahul-autosave",
+      JSON.stringify({title:docTitle.value,blocks:this.blocks}));
+  }
+
+  loadAuto(){
+    const saved=localStorage.getItem("rahul-autosave");
+    if(saved){
+      const data=JSON.parse(saved);
+      this.blocks=data.blocks;
+      docTitle.value=data.title;
+      this.render();
+    }
+  }
+
+  addBlock(type){
+    this.blocks.push(BlockRegistry[type].create());
+    this.render();
+    this.autoSave();
+  }
+
+  deleteBlock(i){
+    this.blocks.splice(i,1);
+    this.render();
+    this.autoSave();
+  }
+
+  duplicate(i){
+    this.blocks.splice(i+1,0,
+      JSON.parse(JSON.stringify(this.blocks[i])));
+    this.render();
+    this.autoSave();
+  }
+
+  switchType(i){
+    const b=this.blocks[i];
+    if(b.type==="paragraph"){
+      this.blocks[i]=BlockRegistry.heading.create({content:b.content});
+    }else{
+      this.blocks[i]=BlockRegistry.paragraph.create({content:b.content});
+    }
+    this.render();
+    this.autoSave();
+  }
+
+  render(){
+    const canvas=document.getElementById("canvas");
+    canvas.innerHTML=this.blocks
+      .map((b,i)=>BlockRegistry[b.type].render(b,i))
+      .join("");
+
+    this.attachEvents();
+  }
+
+  attachEvents(){
+    document.querySelectorAll(".block").forEach(el=>{
+      const i=el.dataset.index;
+      const editable=el.querySelector("[contenteditable]");
+
+      editable.oninput=()=>{
+        this.blocks[i].content=editable.innerHTML;
+        this.autoSave();
+      };
+
+      // drag
+      el.ondragstart=(e)=>{
+        e.dataTransfer.setData("text/plain",i);
+      };
+
+      el.ondragover=(e)=>e.preventDefault();
+
+      el.ondrop=(e)=>{
+        const from=e.dataTransfer.getData("text");
+        const temp=this.blocks[from];
+        this.blocks.splice(from,1);
+        this.blocks.splice(i,0,temp);
+        this.render();
+        this.autoSave();
+      };
+
+    });
+  }
+
+}
+
+/* ================= TEXT TOOLBAR ================= */
+
+document.addEventListener("mouseup",()=>{
+  const sel=window.getSelection();
+  if(sel.toString().length>0){
+    const rect=sel.getRangeAt(0).getBoundingClientRect();
+    const tb=textToolbar;
+    tb.style.display="block";
+    tb.style.top=(rect.top-40)+"px";
+    tb.style.left=rect.left+"px";
+  }else textToolbar.style.display="none";
+});
+
+function format(cmd){
+  document.execCommand(cmd,false,null);
+}
+
+/* ================= SLASH COMMAND ================= */
+
+document.addEventListener("keydown",(e)=>{
+  if(e.key==="/"){
+    slashMenu.style.display="block";
+    slashMenu.style.top="200px";
+    slashMenu.style.left="200px";
+  }
+});
+
+/* ================= EXPORT ================= */
+
+function downloadHTML(){
+  const bodyContent=editor.blocks.map(b=>{
+    if(b.type==="paragraph") return `<p>${b.content}</p>`;
+    if(b.type==="heading") return `<h2>${b.content}</h2>`;
+  }).join("\n");
+
+  const fullHTML=`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${docTitle.value}</title>
+<style>body{font-family:system-ui;padding:40px;}</style>
+</head>
+<body>
+<h1>${docTitle.value}</h1>
+${bodyContent}
+</body>
+</html>`;
+
+  const blob=new Blob([fullHTML],{type:"text/html"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="document.html";
+  a.click();
+}
+
+/* ================= INIT ================= */
+
+const editor=new Editor();
+
+</script>
+</body>
+</html>
