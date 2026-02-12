@@ -2,370 +2,247 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Rahul Publishing Studio v3.0</title>
+<title>Rahul Gutenberg Studio</title>
 
 <link href="https://unpkg.com/grapesjs/dist/css/grapes.min.css" rel="stylesheet"/>
 <script src="https://unpkg.com/grapesjs"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.0.2/docx.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-
-<link rel="manifest" href="manifest.json">
 
 <style>
-:root {
-  --primary:#2563eb;
-  --heading:#111827;
-  --text:#374151;
-  --bg:#ffffff;
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+  background:#f0f0f1;
 }
 
-body { margin:0; font-family:Arial; background:#f3f4f6; }
-body.dark { background:#111827; color:white; }
+/* ===== TOPBAR ===== */
 
-.topbar {
-  background:#111827;
-  padding:15px 30px;
-  color:white;
+.wp-topbar{
+  height:60px;
+  background:#fff;
   display:flex;
-  justify-content:space-between;
   align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+  border-bottom:1px solid #ddd;
 }
 
-.main { display:flex; }
+.wp-topbar .left button{
+  font-size:18px;
+  background:none;
+  border:none;
+  cursor:pointer;
+}
 
-.sidebar {
-  width:280px;
-  background:white;
+.wp-topbar input{
+  border:none;
+  font-size:18px;
+  font-weight:500;
+  text-align:center;
+  outline:none;
+  width:400px;
+}
+
+.wp-topbar .right button{
+  background:#0073aa;
+  border:none;
+  padding:8px 14px;
+  color:white;
+  border-radius:4px;
+  cursor:pointer;
+  margin-left:8px;
+}
+
+.wp-topbar .right button:hover{
+  background:#005177;
+}
+
+/* ===== LAYOUT ===== */
+
+.wp-layout{
+  display:flex;
+  height:calc(100vh - 60px);
+}
+
+/* ===== SIDEBAR ===== */
+
+.wp-sidebar{
+  width:260px;
+  background:#fff;
+  border-right:1px solid #ddd;
   padding:20px;
-  border-right:1px solid #e5e7eb;
-  height:90vh;
   overflow:auto;
 }
 
-.editor-area {
-  flex:1;
-  background:white;
-  margin:20px;
-  border-radius:12px;
-  overflow:hidden;
+.wp-sidebar h3{
+  margin-top:0;
 }
 
-button,input { margin-bottom:6px; width:100%; }
+.wp-sidebar button{
+  display:block;
+  width:100%;
+  margin-bottom:10px;
+  padding:10px;
+  border:1px solid #ddd;
+  background:white;
+  cursor:pointer;
+  text-align:left;
+  font-size:14px;
+}
+
+.wp-sidebar button:hover{
+  background:#f3f4f6;
+}
+
+/* ===== EDITOR AREA ===== */
+
+.wp-editor{
+  flex:1;
+  background:#dcd2c2;
+  display:flex;
+  justify-content:center;
+  overflow:auto;
+}
+
+#gjs{
+  width:800px;
+  background:#dcd2c2;
+  padding:60px 40px;
+  min-height:100%;
+}
+
+/* Remove Grapes default UI */
+.gjs-pn-panel{
+  display:none !important;
+}
+.gjs-cv-canvas{
+  background:#dcd2c2 !important;
+}
 </style>
 </head>
 
 <body>
 
-<div class="topbar">
-  <div>Rahul Publishing Studio</div>
-  <div>
-    <input type="color" id="themeColor">
-    <button onclick="toggleDark()">Dark</button>
-    <button onclick="generateSummary()">Summary</button>
-    <button onclick="autoNumberFigures()">Number Figures</button>
-    <button onclick="exportPDF()">PDF</button>
-    <button onclick="exportDOCX()">DOCX</button>
-    <button onclick="exportAll()">Website</button>
-    <button onclick="backupProject()">Backup</button>
-    <input type="file" onchange="restoreProject(event)">
+<div class="wp-topbar">
+  <div class="left">
+    <button onclick="toggleSidebar()">☰</button>
+  </div>
+
+  <div class="center">
+    <input type="text" id="docTitle" placeholder="Add title">
+  </div>
+
+  <div class="right">
+    <button onclick="saveContent()">Save</button>
+    <button onclick="exportPDF()">Publish</button>
   </div>
 </div>
 
-<div class="main">
-  <div class="sidebar">
-    <h3>Pages</h3>
-    <div id="pageList"></div>
-    <button onclick="addPage()">+ Add Page</button>
+<div class="wp-layout">
 
-    <hr>
-
-    <input type="file" id="imageUpload" accept="image/*">
-    <button onclick="insertImage()">Insert Image</button>
-
-    <hr>
-
-    <input type="file" id="pdfUpload" accept="application/pdf">
-    <button onclick="extractPDF()">Smart PDF Extract</button>
-
-    <hr>
-
-    <button onclick="addCitation()">Add Citation</button>
-    <button onclick="insertCitation()">Insert Citation</button>
-    <button onclick="generateReferences()">Generate References</button>
+  <div class="wp-sidebar" id="sidebar">
+    <h3>Blocks</h3>
+    <button onclick="addParagraph()">Paragraph</button>
+    <button onclick="addHeading()">Heading</button>
+    <button onclick="addSubHeading()">Sub Heading</button>
+    <button onclick="addImage()">Image</button>
+    <button onclick="addQuote()">Quote</button>
+    <button onclick="addList()">List</button>
+    <button onclick="addTable()">Table</button>
   </div>
 
-  <div class="editor-area">
+  <div class="wp-editor">
     <div id="gjs"></div>
   </div>
+
 </div>
 
 <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
-}
 
-/* ================= STATE ================= */
-
-let project = JSON.parse(localStorage.getItem("rahulStudio")) || { pages:{} };
-let citations = JSON.parse(localStorage.getItem("rahulCitations")) || [];
-
-let currentPage = Object.keys(project.pages)[0] || "home";
-if(!project.pages[currentPage]) project.pages[currentPage] = null;
-
-/* ================= EDITOR ================= */
+/* ===== INIT EDITOR ===== */
 
 const editor = grapesjs.init({
   container:'#gjs',
   height:'100%',
-  storageManager:false
+  storageManager:false,
 });
 
-editor.on('update', ()=> saveCurrent());
+/* ===== BLOCK FUNCTIONS ===== */
 
-/* ================= BLOCKS ================= */
-
-editor.BlockManager.add('unit-template',{
-  label:'Unit Template',
-  content:`
-  <section style="padding:40px;">
-    <h1>Unit Title</h1>
-    <h3>Objectives</h3>
-    <ul><li>Objective 1</li></ul>
-    <h3>Content</h3>
-    <p>Write structured notes here...</p>
-  </section>`
-});
-
-/* ================= PAGE SYSTEM ================= */
-
-function renderPages(){
-  const list=document.getElementById("pageList");
-  list.innerHTML="";
-  Object.keys(project.pages).forEach(p=>{
-    const btn=document.createElement("button");
-    btn.innerText=p;
-    btn.onclick=()=>switchPage(p);
-    list.appendChild(btn);
-  });
-
-  new Sortable(list,{
-    animation:150,
-    onEnd:function(){
-      const order=[];
-      document.querySelectorAll("#pageList button")
-        .forEach(btn=>order.push(btn.innerText));
-      const reordered={};
-      order.forEach(p=>reordered[p]=project.pages[p]);
-      project.pages=reordered;
-      saveCurrent();
-    }
-  });
+function addParagraph(){
+  editor.addComponents(`<p>Start writing your content here...</p>`);
 }
 
-function addPage(){
-  const name=prompt("Page Name:");
-  if(!name) return;
-  saveCurrent();
-  project.pages[name]=null;
-  currentPage=name;
-  editor.setComponents(`<h1>${name}</h1>`);
-  saveCurrent();
-  renderPages();
+function addHeading(){
+  editor.addComponents(`<h2>Heading</h2>`);
 }
 
-function switchPage(name){
-  saveCurrent();
-  currentPage=name;
-  if(project.pages[name]){
-    editor.loadProjectData(project.pages[name]);
-  } else {
-    editor.setComponents(`<h1>${name}</h1>`);
+function addSubHeading(){
+  editor.addComponents(`<h3>Sub Heading</h3>`);
+}
+
+function addImage(){
+  editor.addComponents(`
+    <figure>
+      <img src="https://via.placeholder.com/700x350" style="max-width:100%">
+      <figcaption>Image caption</figcaption>
+    </figure>
+  `);
+}
+
+function addQuote(){
+  editor.addComponents(`<blockquote style="border-left:4px solid #999;padding-left:15px;">Quote text...</blockquote>`);
+}
+
+function addList(){
+  editor.addComponents(`<ul><li>List item</li></ul>`);
+}
+
+function addTable(){
+  editor.addComponents(`
+    <table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
+      <tr><th>Header 1</th><th>Header 2</th></tr>
+      <tr><td>Data</td><td>Data</td></tr>
+    </table>
+  `);
+}
+
+/* ===== SIDEBAR TOGGLE ===== */
+
+function toggleSidebar(){
+  const sidebar = document.getElementById("sidebar");
+  sidebar.style.display =
+    sidebar.style.display === "none" ? "block" : "none";
+}
+
+/* ===== SAVE ===== */
+
+function saveContent(){
+  const content = editor.getHtml();
+  const title = document.getElementById("docTitle").value;
+  localStorage.setItem("rahulDoc", JSON.stringify({title,content}));
+  alert("Saved successfully!");
+}
+
+/* ===== LOAD ON START ===== */
+
+window.onload = function(){
+  const saved = JSON.parse(localStorage.getItem("rahulDoc"));
+  if(saved){
+    document.getElementById("docTitle").value = saved.title;
+    editor.setComponents(saved.content);
   }
-}
+};
 
-function saveCurrent(){
-  project.pages[currentPage]=editor.getProjectData();
-  localStorage.setItem("rahulStudio", JSON.stringify(project));
-}
-
-/* ================= IMAGE ================= */
-
-function insertImage(){
-  const file=document.getElementById("imageUpload").files[0];
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=function(e){
-    editor.addComponents(`
-      <figure style="text-align:center;padding:20px;">
-        <img src="${e.target.result}" style="max-width:100%;">
-        <figcaption>Caption</figcaption>
-      </figure>
-    `);
-  };
-  reader.readAsDataURL(file);
-}
-
-/* ================= PDF SMART EXTRACT ================= */
-
-async function extractPDF(){
-  const file=document.getElementById("pdfUpload").files[0];
-  if(!file) return;
-
-  const reader=new FileReader();
-  reader.onload=async function(){
-    const pdf=await pdfjsLib.getDocument(new Uint8Array(this.result)).promise;
-    let structured="";
-    for(let i=1;i<=pdf.numPages;i++){
-      const page=await pdf.getPage(i);
-      const content=await page.getTextContent();
-      const lines=content.items.map(it=>it.str);
-      lines.forEach(line=>{
-        if(line.match(/^[A-Z\s]{5,}$/)) structured+=`<h2>${line}</h2>`;
-        else if(line.match(/^\d+(\.\d+)*\s/)) structured+=`<h3>${line}</h3>`;
-        else structured+=line+" ";
-      });
-      structured+="<br><br>";
-    }
-    editor.addComponents(`<section><h1>Extracted</h1>${structured}</section>`);
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-/* ================= SUMMARY ================= */
-
-function generateSummary(){
-  const html=editor.getHtml();
-  const temp=document.createElement("div");
-  temp.innerHTML=html;
-  let summary="<h2>Summary</h2><ul>";
-  temp.querySelectorAll("h1,h2,h3").forEach(h=>{
-    let next=h.nextElementSibling;
-    if(next){
-      const text=next.innerText.split(".").slice(0,2).join(".");
-      summary+=`<li><strong>${h.innerText}:</strong> ${text}.</li>`;
-    }
-  });
-  summary+="</ul>";
-  editor.addComponents(`<section style="padding:40px;">${summary}</section>`);
-}
-
-/* ================= FIGURE NUMBERING ================= */
-
-function autoNumberFigures(){
-  const figs=editor.getWrapper().find("figure");
-  figs.forEach((fig,i)=>{
-    const cap=fig.find("figcaption")[0];
-    if(cap){
-      cap.components(`Figure ${i+1}: ${cap.components().toString()}`);
-    }
-  });
-}
-
-/* ================= CITATIONS ================= */
-
-function addCitation(){
-  const ref=prompt("Enter reference:");
-  if(ref){
-    citations.push(ref);
-    localStorage.setItem("rahulCitations",JSON.stringify(citations));
-  }
-}
-
-function insertCitation(){
-  const index=prompt("Citation number:");
-  if(index) editor.addComponents(`<sup>[${index}]</sup>`);
-}
-
-function generateReferences(){
-  let html="<h2>References</h2><ol>";
-  citations.forEach(r=>html+=`<li>${r}</li>`);
-  html+="</ol>";
-  editor.addComponents(`<section>${html}</section>`);
-}
-
-/* ================= EXPORT WEBSITE ================= */
-
-async function exportAll(){
-  saveCurrent();
-  const zip=new JSZip();
-  let sitemap='<?xml version="1.0"?><urlset>';
-
-  Object.keys(project.pages).forEach(p=>{
-    editor.loadProjectData(project.pages[p]);
-    const html=editor.getHtml();
-    const css=editor.getCss();
-    zip.file(p+".html",`<html><head><style>${css}</style></head><body>${html}</body></html>`);
-    sitemap+=`<url><loc>${p}.html</loc></url>`;
-  });
-
-  sitemap+='</urlset>';
-  zip.file("sitemap.xml",sitemap);
-
-  const blob=await zip.generateAsync({type:"blob"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="rahul-site.zip";
-  a.click();
-}
-
-/* ================= EXPORT PDF ================= */
+/* ===== EXPORT PDF ===== */
 
 function exportPDF(){
-  const element=document.createElement("div");
-  element.innerHTML=editor.getHtml();
-  html2pdf().from(element).save(currentPage+".pdf");
+  const element = document.createElement("div");
+  element.innerHTML = `<h1>${document.getElementById("docTitle").value}</h1>` + editor.getHtml();
+  html2pdf().from(element).save("document.pdf");
 }
-
-/* ================= EXPORT DOCX ================= */
-
-async function exportDOCX(){
-  const text=editor.getHtml().replace(/<[^>]+>/g,"");
-  const doc=new docx.Document({
-    sections:[{children:[new docx.Paragraph(text)]}]
-  });
-  const blob=await docx.Packer.toBlob(doc);
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download=currentPage+".docx";
-  a.click();
-}
-
-/* ================= BACKUP ================= */
-
-function backupProject(){
-  const blob=new Blob([JSON.stringify(project)],{type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="backup.json";
-  a.click();
-}
-
-function restoreProject(e){
-  const reader=new FileReader();
-  reader.onload=function(){
-    project=JSON.parse(this.result);
-    localStorage.setItem("rahulStudio",JSON.stringify(project));
-    location.reload();
-  };
-  reader.readAsText(e.target.files[0]);
-}
-
-/* ================= UI ================= */
-
-function toggleDark(){ document.body.classList.toggle("dark"); }
-
-document.getElementById("themeColor")
-.addEventListener("input",e=>{
-  document.documentElement.style.setProperty('--primary', e.target.value);
-});
-
-/* INIT */
-renderPages();
-switchPage(currentPage);
 
 </script>
+
 </body>
 </html>
