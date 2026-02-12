@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rahul Offline Editor v2</title>
+
+<style>
+body{margin:0;font-family:system-ui;background:#f4f4f4;}
+
+.topbar{
+  height:60px;
+  background:white;
+  border-bottom:1px solid #ddd;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+}
+
+.topbar button{padding:6px 12px;cursor:pointer;}
+
+.layout{display:flex;height:calc(100vh - 60px);}
+
+.sidebar{
+  width:200px;
+  background:white;
+  border-right:1px solid #ddd;
+  padding:10px;
+}
+
+.sidebar button{
+  width:100%;
+  margin-bottom:8px;
+  padding:8px;
+}
+
+.canvas{
+  flex:1;
+  padding:50px;
+  overflow:auto;
+}
+
+.block{
+  background:white;
+  padding:10px;
+  margin-bottom:10px;
+  border:1px solid transparent;
+  position:relative;
+}
+
+.block.selected{
+  border:1px solid #0073aa;
+}
+
+/* Block Toolbar */
+.block-toolbar{
+  position:absolute;
+  top:-28px;
+  right:0;
+  background:#111;
+  color:white;
+  padding:4px 6px;
+  border-radius:4px;
+  display:none;
+}
+
+.block.selected .block-toolbar{
+  display:block;
+}
+
+.block-toolbar button{
+  background:none;
+  border:none;
+  color:white;
+  cursor:pointer;
+  margin:0 4px;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <strong>Rahul Editor v2</strong>
+  <div>
+    <button onclick="editor.undo()">Undo</button>
+    <button onclick="editor.redo()">Redo</button>
+    <button onclick="downloadHTML()">Save as HTML</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <button onclick="editor.addBlock('paragraph')">+ Paragraph</button>
+    <button onclick="editor.addBlock('heading')">+ Heading</button>
+  </div>
+
+  <div class="canvas" id="canvas"></div>
+</div>
+
+<script>
+
+/* ================= BLOCK REGISTRY ================= */
+
+const BlockRegistry = {
+
+  paragraph:{
+    create(){ return {type:"paragraph",content:"New paragraph..."}; },
+    render(block,index){
+      return `
+        <div class="block" data-index="${index}">
+          <div class="block-toolbar">
+            <button onclick="editor.moveUp(${index})">↑</button>
+            <button onclick="editor.moveDown(${index})">↓</button>
+            <button onclick="editor.deleteBlock(${index})">✕</button>
+          </div>
+          <p contenteditable="true">${block.content}</p>
+        </div>`;
+    }
+  },
+
+  heading:{
+    create(){ return {type:"heading",level:2,content:"New heading"}; },
+    render(block,index){
+      return `
+        <div class="block" data-index="${index}">
+          <div class="block-toolbar">
+            <button onclick="editor.moveUp(${index})">↑</button>
+            <button onclick="editor.moveDown(${index})">↓</button>
+            <button onclick="editor.deleteBlock(${index})">✕</button>
+          </div>
+          <h${block.level} contenteditable="true">${block.content}</h${block.level}>
+        </div>`;
+    }
+  }
+
+};
+
+/* ================= EDITOR ENGINE ================= */
+
+class Editor{
+
+  constructor(){
+    this.blocks=[];
+    this.history=[];
+    this.future=[];
+  }
+
+  saveHistory(){
+    this.history.push(JSON.stringify(this.blocks));
+    if(this.history.length>100) this.history.shift();
+    this.future=[];
+  }
+
+  addBlock(type){
+    this.saveHistory();
+    this.blocks.push(BlockRegistry[type].create());
+    this.render();
+  }
+
+  deleteBlock(index){
+    this.saveHistory();
+    this.blocks.splice(index,1);
+    this.render();
+  }
+
+  moveUp(index){
+    if(index===0) return;
+    this.saveHistory();
+    [this.blocks[index-1],this.blocks[index]]=
+    [this.blocks[index],this.blocks[index-1]];
+    this.render();
+  }
+
+  moveDown(index){
+    if(index===this.blocks.length-1) return;
+    this.saveHistory();
+    [this.blocks[index+1],this.blocks[index]]=
+    [this.blocks[index],this.blocks[index+1]];
+    this.render();
+  }
+
+  undo(){
+    if(this.history.length){
+      this.future.push(JSON.stringify(this.blocks));
+      this.blocks=JSON.parse(this.history.pop());
+      this.render();
+    }
+  }
+
+  redo(){
+    if(this.future.length){
+      this.history.push(JSON.stringify(this.blocks));
+      this.blocks=JSON.parse(this.future.pop());
+      this.render();
+    }
+  }
+
+  render(){
+    const canvas=document.getElementById("canvas");
+
+    canvas.innerHTML=this.blocks
+      .map((b,i)=>BlockRegistry[b.type].render(b,i))
+      .join("");
+
+    this.attachEvents();
+  }
+
+  attachEvents(){
+    document.querySelectorAll(".block").forEach(el=>{
+
+      el.onclick=(e)=>{
+        document.querySelectorAll(".block")
+          .forEach(b=>b.classList.remove("selected"));
+        el.classList.add("selected");
+        e.stopPropagation();
+      };
+
+      const index=el.dataset.index;
+      const editable=el.querySelector("[contenteditable]");
+
+      editable.oninput=()=>{
+        this.blocks[index].content=editable.innerHTML;
+      };
+
+    });
+  }
+
+}
+
+/* ================= EXPORT HTML ================= */
+
+function downloadHTML(){
+
+  const bodyContent=editor.blocks.map(block=>{
+    if(block.type==="paragraph")
+      return `<p>${block.content}</p>`;
+    if(block.type==="heading")
+      return `<h${block.level}>${block.content}</h${block.level}>`;
+  }).join("\n");
+
+  const fullHTML=`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Exported</title>
+<style>body{font-family:system-ui;padding:40px;}</style>
+</head>
+<body>
+${bodyContent}
+</body>
+</html>`;
+
+  const blob=new Blob([fullHTML],{type:"text/html"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="document.html";
+  a.click();
+}
+
+/* ================= KEYBOARD SHORTCUTS ================= */
+
+document.addEventListener("keydown",function(e){
+
+  if(e.ctrlKey && e.key==="b"){
+    e.preventDefault();
+    document.execCommand("bold");
+  }
+
+  if(e.ctrlKey && e.key==="i"){
+    e.preventDefault();
+    document.execCommand("italic");
+  }
+
+});
+
+/* ================= INIT ================= */
+
+const editor=new Editor();
+
+</script>
+</body>
+</html>
