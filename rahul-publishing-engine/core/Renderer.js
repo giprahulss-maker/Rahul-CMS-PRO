@@ -9,7 +9,18 @@ export class Renderer {
   }
 
   renderNode(node) {
-
+if (node.type === "section") {
+  return `
+    <div class="node">
+      <h${node.level}
+          contenteditable="true"
+          data-id="${node.id}">
+          ${node.title}
+      </h${node.level}>
+      ${node.children.map(n => this.renderNode(n)).join("")}
+    </div>
+  `;
+}
     if (node.type === "document") {
       return `
         <div class="topbar">
