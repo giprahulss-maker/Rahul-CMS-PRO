@@ -1,15 +1,13 @@
 export class DocumentModel {
-
-  constructor(){
+  constructor() {
     this.data = {
-      type:"document",
-      meta:{
-        title:"Untitled",
-        author:"",
-        style:"vancouver"
+      type: "document",
+      meta: {
+        title: "Untitled",
+        author: "",
+        style: "vancouver"
       },
-      children:[]
+      children: []
     };
   }
-
 }
