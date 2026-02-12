@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rahul Publishing Engine</title>
+
+<style>
+body{
+  margin:0;
+  font-family:system-ui;
+  background:#f3f3f3;
+}
+
+.topbar{
+  height:60px;
+  background:white;
+  border-bottom:1px solid #ddd;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+}
+
+.layout{
+  display:flex;
+  height:calc(100vh - 60px);
+}
+
+.sidebar{
+  width:220px;
+  background:white;
+  border-right:1px solid #ddd;
+  padding:10px;
+}
+
+.sidebar button{
+  width:100%;
+  margin-bottom:8px;
+  padding:8px;
+}
+
+.canvas{
+  flex:1;
+  padding:40px;
+  overflow:auto;
+}
+
+.node{
+  background:white;
+  padding:10px;
+  margin-bottom:10px;
+  border:1px solid #eee;
+}
+
+.section{
+  margin-left:20px;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <strong>Rahul Publishing Engine — Phase 1</strong>
+  <button onclick="engine.exportJSON()">Export JSON</button>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <button onclick="engine.addChapter()">+ Chapter</button>
+    <button onclick="engine.addSection()">+ Section</button>
+    <button onclick="engine.addParagraph()">+ Paragraph</button>
+  </div>
+
+  <div class="canvas" id="canvas"></div>
+</div>
+
+<script>
+
+/* ============================
+   1️⃣ Utilities
+============================ */
+
+function generateId(prefix){
+  return prefix + "-" + Math.random().toString(36).substr(2,6);
+}
+
+/* ============================
+   2️⃣ Document Model
+============================ */
+
+class DocumentModel{
+  constructor(){
+    this.data = {
+      type:"document",
+      meta:{ title:"Untitled", author:"" },
+      children:[]
+    };
+  }
+}
+
+/* ============================
+   3️⃣ Citation Database
+============================ */
+
+class CitationDB{
+  constructor(){
+    this.citations = [];
+  }
+
+  add(citation){
+    citation.id = generateId("cite");
+    this.citations.push(citation);
+  }
+
+  get(id){
+    return this.citations.find(c=>c.id===id);
+  }
+
+  getAll(){
+    return this.citations;
+  }
+}
+
+/* ============================
+   4️⃣ Academic Engines
+============================ */
+
+class CrossRefEngine{
+  constructor(editor){ this.editor = editor; }
+
+  buildMap(){
+    const map = {};
+    let figCount=1, secCount=1;
+
+    this.editor.walk(this.editor.doc.data,node=>{
+      if(node.type==="figure"){
+        map[node.id]={type:"figure",number:figCount++};
+      }
+      if(node.type==="section"){
+        map[node.id]={type:"section",number:secCount++};
+      }
+    });
+
+    return map;
+  }
+
+  resolve(node,map){
+    const target = map[node.target];
+    if(!target) return "[Broken Ref]";
+    if(target.type==="figure") return `Figure ${target.number}`;
+    if(target.type==="section") return `Section ${target.number}`;
+  }
+}
+
+class CitationEngine{
+
+  constructor(editor,db){
+    this.editor = editor;
+    this.db = db;
+  }
+
+  buildCitationMap(){
+    const map={};
+    let count=1;
+
+    this.editor.walk(this.editor.doc.data,node=>{
+      if(node.type==="citation-ref"){
+        if(!map[node.refId]){
+          map[node.refId]=count++;
+        }
+      }
+    });
+
+    return map;
+  }
+
+  renderInText(node,map){
+    const number = map[node.refId];
+    return `<sup>[${number}]</sup>`;
+  }
+
+  generateBibliography(map){
+    let html="<h2>References</h2><ol>";
+
+    Object.entries(map).forEach(([refId,num])=>{
+      const c = this.db.get(refId);
+      if(!c) return;
+
+      html+=`<li>
+        ${c.author}. ${c.title}. 
+        <i>${c.journal}</i>. 
+        ${c.year};${c.volume}:${c.pages}.
+      </li>`;
+    });
+
+    html+="</ol>";
+    return html;
+  }
+}
+
+/* ============================
+   5️⃣ Publishing Engine
+============================ */
+
+class PublishingEngine{
+
+  constructor(){
+    this.doc = new DocumentModel();
+    this.history=[];
+    this.future=[];
+    this.citationDB = new CitationDB();
+    this.crossRefEngine = new CrossRefEngine(this);
+    this.citationEngine = new CitationEngine(this,this.citationDB);
+    this.render();
+  }
+
+  saveState(){
+    this.history.push(JSON.stringify(this.doc.data));
+    if(this.history.length>100) this.history.shift();
+    this.future=[];
+  }
+
+  /* ===== Add Nodes ===== */
+
+  addChapter(){
+    this.saveState();
+    this.doc.data.children.push({
+      type:"chapter",
+      id:generateId("ch"),
+      title:"New Chapter",
+      children:[]
+    });
+    this.render();
+  }
+
+  addSection(parentId){
+    this.saveState();
+    this.insertInto(parentId,{
+      type:"section",
+      id:generateId("sec"),
+      title:"New Section",
+      children:[]
+    });
+    this.render();
+  }
+
+  addParagraph(parentId){
+    this.saveState();
+    this.insertInto(parentId,{
+      type:"paragraph",
+      id:generateId("p"),
+      content:"New paragraph..."
+    });
+    this.render();
+  }
+
+  addFigure(parentId){
+    this.saveState();
+    this.insertInto(parentId,{
+      type:"figure",
+      id:generateId("fig"),
+      src:"",
+      caption:"Figure caption"
+    });
+    this.render();
+  }
+
+  addCitationRef(parentId,refId){
+    this.saveState();
+    this.insertInto(parentId,{
+      type:"citation-ref",
+      id:generateId("citer"),
+      refId:refId
+    });
+    this.render();
+  }
+
+  addCitation(){
+    const author=prompt("Author:");
+    const title=prompt("Title:");
+    const journal=prompt("Journal:");
+    const year=prompt("Year:");
+    const volume=prompt("Volume:");
+    const pages=prompt("Pages:");
+
+    this.citationDB.add({
+      author,title,journal,year,volume,pages
+    });
+
+    alert("Citation Added.");
+  }
+
+  /* ===== Insert ===== */
+
+  insertInto(parentId,node){
+    this.walk(this.doc.data,parent=>{
+      if(parent.id===parentId){
+        if(!parent.children) parent.children=[];
+        parent.children.push(node);
+      }
+    });
+  }
+
+  /* ===== Walk ===== */
+
+  walk(node,callback){
+    callback(node);
+    if(node.children){
+      node.children.forEach(child=>this.walk(child,callback));
+    }
+  }
+
+  /* ===== Render ===== */
+
+  render(){
+    const canvas=document.getElementById("canvas");
+    const refMap=this.crossRefEngine.buildMap();
+    const citationMap=this.citationEngine.buildCitationMap();
+    canvas.innerHTML=this.renderNode(this.doc.data,refMap,citationMap);
+  }
+
+  renderNode(node,refMap,citationMap){
+
+    if(node.type==="document"){
+      return `
+        ${this.generateTOC(refMap)}
+        ${node.children.map(n=>this.renderNode(n,refMap,citationMap)).join("")}
+        ${this.citationEngine.generateBibliography(citationMap)}
+      `;
+    }
+
+    if(node.type==="chapter"){
+      return `
+        <div class="node">
+          <button onclick="engine.addSection('${node.id}')">+ Section</button>
+          <button onclick="engine.addCitation()">+ Add Citation</button>
+          <h1 contenteditable="true"
+            oninput="engine.updateNode('${node.id}','title',this.innerText)">
+            ${node.title}
+          </h1>
+          ${node.children.map(n=>this.renderNode(n,refMap,citationMap)).join("")}
+        </div>
+      `;
+    }
+
+    if(node.type==="section"){
+      const secNumber=refMap[node.id]?.number||"";
+      return `
+        <div class="node section">
+          <button onclick="engine.addParagraph('${node.id}')">+ Paragraph</button>
+          <button onclick="engine.addFigure('${node.id}')">+ Figure</button>
+          <h2 contenteditable="true"
+            oninput="engine.updateNode('${node.id}','title',this.innerText)">
+            ${secNumber}. ${node.title}
+          </h2>
+          ${node.children.map(n=>this.renderNode(n,refMap,citationMap)).join("")}
+        </div>
+      `;
+    }
+
+    if(node.type==="paragraph"){
+      return `
+        <div class="node section">
+          <p contenteditable="true"
+            oninput="engine.updateNode('${node.id}','content',this.innerText)">
+            ${node.content}
+          </p>
+        </div>
+      `;
+    }
+
+    if(node.type==="figure"){
+      const figNumber=refMap[node.id]?.number||"";
+      return `
+        <div class="node section">
+          <input type="file"
+            onchange="engine.uploadImage(event,'${node.id}')">
+          ${node.src?`<img src="${node.src}" style="max-width:100%">`:""}
+          <p contenteditable="true"
+            oninput="engine.updateNode('${node.id}','caption',this.innerText)">
+            Figure ${figNumber}: ${node.caption}
+          </p>
+        </div>
+      `;
+    }
+
+    if(node.type==="citation-ref"){
+      return this.citationEngine.renderInText(node,citationMap);
+    }
+
+  }
+
+  generateTOC(refMap){
+    let html="<h2>Table of Contents</h2><ul>";
+
+    this.walk(this.doc.data,node=>{
+      if(node.type==="section"){
+        html+=`<li>${refMap[node.id]?.number}. ${node.title}</li>`;
+      }
+    });
+
+    html+="</ul>";
+    return html;
+  }
+
+  updateNode(id,field,value){
+    this.walk(this.doc.data,node=>{
+      if(node.id===id){
+        node[field]=value;
+      }
+    });
+  }
+
+  uploadImage(e,id){
+    const reader=new FileReader();
+    reader.onload=()=>{
+      this.updateNode(id,"src",reader.result);
+      this.render();
+    };
+    reader.readAsDataURL(e.target.files[0]);
+  }
+
+}
+
+/* ============================
+   6️⃣ Init
+============================ */
+
+const engine=new PublishingEngine();
+
+</script>
+
+</body>
+</html>
