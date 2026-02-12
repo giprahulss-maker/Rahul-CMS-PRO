@@ -2,24 +2,40 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Rahul Block Engine</title>
+<title>Rahul Offline Editor v1</title>
+
 <style>
-body { margin:0; font-family:system-ui; background:#f5f5f5; }
+body{
+  margin:0;
+  font-family:system-ui;
+  background:#f4f4f4;
+}
+
+/* ===== TOPBAR ===== */
 
 .topbar{
   height:60px;
   background:white;
+  border-bottom:1px solid #ddd;
   display:flex;
   align-items:center;
   justify-content:space-between;
   padding:0 20px;
-  border-bottom:1px solid #ddd;
 }
+
+.topbar button{
+  padding:6px 12px;
+  cursor:pointer;
+}
+
+/* ===== LAYOUT ===== */
 
 .layout{
   display:flex;
   height:calc(100vh - 60px);
 }
+
+/* SIDEBAR */
 
 .sidebar{
   width:220px;
@@ -32,11 +48,14 @@ body { margin:0; font-family:system-ui; background:#f5f5f5; }
   width:100%;
   margin-bottom:8px;
   padding:8px;
+  cursor:pointer;
 }
+
+/* CANVAS */
 
 .canvas{
   flex:1;
-  padding:40px;
+  padding:50px;
   overflow:auto;
 }
 
@@ -55,16 +74,17 @@ body { margin:0; font-family:system-ui; background:#f5f5f5; }
 <body>
 
 <div class="topbar">
-  <strong>Rahul Block Engine</strong>
+  <strong>Rahul Editor</strong>
   <div>
-    <button onclick="undo()">Undo</button>
-    <button onclick="redo()">Redo</button>
-    <button onclick="save()">Save</button>
+    <button onclick="editor.addBlock('paragraph')">+ Paragraph</button>
+    <button onclick="editor.addBlock('heading')">+ Heading</button>
+    <button onclick="downloadHTML()">Save as HTML</button>
   </div>
 </div>
 
 <div class="layout">
   <div class="sidebar">
+    <h4>Blocks</h4>
     <button onclick="editor.addBlock('paragraph')">Paragraph</button>
     <button onclick="editor.addBlock('heading')">Heading</button>
   </div>
@@ -79,57 +99,77 @@ body { margin:0; font-family:system-ui; background:#f5f5f5; }
 =========================== */
 
 const BlockRegistry = {
-  paragraph: {
-    create(data = { content: "New paragraph..." }) {
-      return { type:"paragraph", content:data.content };
+
+  paragraph:{
+    create(){
+      return {
+        type:"paragraph",
+        content:"New paragraph..."
+      };
     },
-    render(block, index) {
-      return `<div class="block" data-index="${index}">
-        <p contenteditable="true">${block.content}</p>
-      </div>`;
+
+    render(block,index){
+      return `
+        <div class="block" data-index="${index}">
+          <p contenteditable="true">${block.content}</p>
+        </div>
+      `;
     }
   },
-  heading: {
-    create(data = { content: "Heading", level:2 }) {
-      return { type:"heading", content:data.content, level:data.level };
+
+  heading:{
+    create(){
+      return {
+        type:"heading",
+        level:2,
+        content:"New heading"
+      };
     },
-    render(block, index) {
-      return `<div class="block" data-index="${index}">
-        <h${block.level} contenteditable="true">${block.content}</h${block.level}>
-      </div>`;
+
+    render(block,index){
+      return `
+        <div class="block" data-index="${index}">
+          <h${block.level} contenteditable="true">${block.content}</h${block.level}>
+        </div>
+      `;
     }
   }
+
 };
+
 
 /* ===========================
    EDITOR ENGINE
 =========================== */
 
-class Editor {
+class Editor{
+
   constructor(){
     this.blocks = [];
-    this.history = [];
-    this.future = [];
   }
 
   addBlock(type){
     const block = BlockRegistry[type].create();
     this.blocks.push(block);
-    this.saveHistory();
     this.render();
   }
 
   render(){
     const canvas = document.getElementById("canvas");
+
     canvas.innerHTML = this.blocks
-      .map((b,i)=>BlockRegistry[b.type].render(b,i))
+      .map((block,index)=>{
+        return BlockRegistry[block.type].render(block,index);
+      })
       .join("");
 
     this.attachEvents();
   }
 
   attachEvents(){
+
     document.querySelectorAll(".block").forEach(el=>{
+
       el.onclick = (e)=>{
         document.querySelectorAll(".block")
           .forEach(b=>b.classList.remove("selected"));
@@ -139,58 +179,66 @@ class Editor {
 
       const index = el.dataset.index;
       const editable = el.querySelector("[contenteditable]");
+
       editable.oninput = ()=>{
         this.blocks[index].content = editable.innerText;
       };
+
     });
+
   }
 
-  saveHistory(){
-    this.history.push(JSON.stringify(this.blocks));
-    if(this.history.length > 50) this.history.shift();
-  }
-
-  undo(){
-    if(this.history.length > 1){
-      this.future.push(this.history.pop());
-      this.blocks = JSON.parse(this.history[this.history.length-1]);
-      this.render();
-    }
-  }
-
-  redo(){
-    if(this.future.length){
-      const state = this.future.pop();
-      this.history.push(state);
-      this.blocks = JSON.parse(state);
-      this.render();
-    }
-  }
-
-  save(){
-    localStorage.setItem("rahul-engine", JSON.stringify(this.blocks));
-  }
-
-  load(){
-    const data = localStorage.getItem("rahul-engine");
-    if(data){
-      this.blocks = JSON.parse(data);
-      this.render();
-      this.saveHistory();
-    }
-  }
 }
+
+/* ===========================
+   EXPORT HTML FILE
+=========================== */
+
+function downloadHTML(){
+
+  let bodyContent = editor.blocks.map(block=>{
+
+    if(block.type==="paragraph"){
+      return `<p>${block.content}</p>`;
+    }
+
+    if(block.type==="heading"){
+      return `<h${block.level}>${block.content}</h${block.level}>`;
+    }
+
+  }).join("\n");
+
+  const fullHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Exported Document</title>
+<style>
+body{ font-family:system-ui; padding:40px; }
+</style>
+</head>
+<body>
+
+${bodyContent}
+
+</body>
+</html>
+`;
+
+  const blob = new Blob([fullHTML], {type:"text/html"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "document.html";
+  a.click();
+}
+
 
 /* ===========================
    INITIALIZE
 =========================== */
 
 const editor = new Editor();
-editor.load();
-
-function undo(){ editor.undo(); }
-function redo(){ editor.redo(); }
-function save(){ editor.save(); }
 
 </script>
 </body>
