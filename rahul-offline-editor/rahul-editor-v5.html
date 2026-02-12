@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rahul Editor v5</title>
+
+<style>
+:root{
+  --bg:#f3f3f3;
+  --card:#ffffff;
+  --border:#ddd;
+}
+
+body{
+  margin:0;
+  font-family:system-ui;
+  background:var(--bg);
+}
+
+body.dark{
+  --bg:#1e1e1e;
+  --card:#2a2a2a;
+  --border:#444;
+  color:white;
+}
+
+.topbar{
+  height:60px;
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+}
+
+.topbar select, .topbar button{
+  margin-left:10px;
+}
+
+.layout{
+  display:flex;
+  height:calc(100vh - 60px);
+}
+
+.workspace{
+  width:200px;
+  background:var(--card);
+  border-right:1px solid var(--border);
+  padding:10px;
+  overflow:auto;
+}
+
+.workspace button{
+  width:100%;
+  margin-bottom:6px;
+}
+
+.canvas{
+  flex:1;
+  padding:40px;
+  overflow:auto;
+}
+
+.block{
+  background:var(--card);
+  padding:10px;
+  margin-bottom:10px;
+  border:1px solid transparent;
+  transition:0.2s;
+}
+
+.block.selected{
+  border:1px solid #0073aa;
+  transform:scale(1.01);
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <strong>Rahul Editor</strong>
+    <select onchange="editor.switchDoc(this.value)" id="docSelect"></select>
+    <button onclick="editor.newDoc()">New Doc</button>
+  </div>
+
+  <div>
+    <button onclick="editor.undo()">Undo</button>
+    <button onclick="editor.redo()">Redo</button>
+    <button onclick="editor.exportJSON()">Export JSON</button>
+    <button onclick="editor.exportHTML()">Export HTML</button>
+    <button onclick="toggleTheme()">Theme</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="workspace">
+    <button onclick="editor.addBlock('paragraph')">+ Paragraph</button>
+    <button onclick="editor.addBlock('heading')">+ Heading</button>
+    <button onclick="editor.addBlock('list')">+ List</button>
+  </div>
+  <div class="canvas" id="canvas"></div>
+</div>
+
+<script>
+
+/* ================= PLUGIN SYSTEM ================= */
+
+const Plugins=[];
+
+function registerPlugin(plugin){
+  Plugins.push(plugin);
+}
+
+/* Example plugin */
+registerPlugin({
+  onRender(blocks){
+    console.log("Plugin: blocks count",blocks.length);
+  }
+});
+
+/* ================= EDITOR ================= */
+
+class Editor{
+
+  constructor(){
+    this.docs=JSON.parse(localStorage.getItem("rahul-docs"))||{
+      "Document 1":[]
+    };
+    this.current="Document 1";
+    this.history=[];
+    this.future=[];
+    this.loadWorkspace();
+  }
+
+  loadWorkspace(){
+    const select=document.getElementById("docSelect");
+    select.innerHTML="";
+    Object.keys(this.docs).forEach(name=>{
+      const opt=document.createElement("option");
+      opt.value=name;
+      opt.innerText=name;
+      select.appendChild(opt);
+    });
+    select.value=this.current;
+    this.render();
+  }
+
+  switchDoc(name){
+    this.saveState();
+    this.current=name;
+    this.render();
+  }
+
+  newDoc(){
+    const name="Document "+(Object.keys(this.docs).length+1);
+    this.docs[name]=[];
+    this.current=name;
+    this.saveAll();
+    this.loadWorkspace();
+  }
+
+  saveAll(){
+    localStorage.setItem("rahul-docs",JSON.stringify(this.docs));
+  }
+
+  get blocks(){
+    return this.docs[this.current];
+  }
+
+  set blocks(value){
+    this.docs[this.current]=value;
+    this.saveAll();
+  }
+
+  saveState(){
+    this.history.push(JSON.stringify(this.blocks));
+    this.future=[];
+  }
+
+  undo(){
+    if(this.history.length){
+      this.future.push(JSON.stringify(this.blocks));
+      this.blocks=JSON.parse(this.history.pop());
+      this.render();
+    }
+  }
+
+  redo(){
+    if(this.future.length){
+      this.history.push(JSON.stringify(this.blocks));
+      this.blocks=JSON.parse(this.future.pop());
+      this.render();
+    }
+  }
+
+  addBlock(type){
+    this.saveState();
+    if(type==="paragraph") this.blocks.push({type:"paragraph",content:""});
+    if(type==="heading") this.blocks.push({type:"heading",level:2,content:"Heading"});
+    if(type==="list") this.blocks.push({type:"list",items:["Item"]});
+    this.render();
+  }
+
+  render(){
+    const canvas=document.getElementById("canvas");
+    canvas.innerHTML=this.blocks.map((b,i)=>{
+      if(b.type==="paragraph")
+        return `<div class="block" draggable="true" data-i="${i}">
+          <p contenteditable="true">${b.content}</p>
+        </div>`;
+      if(b.type==="heading")
+        return `<div class="block" draggable="true" data-i="${i}">
+          <h${b.level} contenteditable="true">${b.content}</h${b.level}>
+        </div>`;
+      if(b.type==="list")
+        return `<div class="block" draggable="true" data-i="${i}">
+          <ul contenteditable="true">${b.items.map(li=>`<li>${li}</li>`).join("")}</ul>
+        </div>`;
+    }).join("");
+
+    this.attach();
+    Plugins.forEach(p=>p.onRender?.(this.blocks));
+  }
+
+  attach(){
+    document.querySelectorAll(".block").forEach(el=>{
+      const i=el.dataset.i;
+
+      el.onclick=(e)=>{
+        document.querySelectorAll(".block")
+          .forEach(b=>b.classList.remove("selected"));
+        el.classList.add("selected");
+        e.stopPropagation();
+      };
+
+      el.ondragstart=e=>{
+        e.dataTransfer.setData("text",i);
+      };
+
+      el.ondragover=e=>e.preventDefault();
+
+      el.ondrop=e=>{
+        const from=e.dataTransfer.getData("text");
+        this.saveState();
+        const temp=this.blocks[from];
+        this.blocks.splice(from,1);
+        this.blocks.splice(i,0,temp);
+        this.render();
+      };
+
+      const editable=el.querySelector("[contenteditable]");
+      editable.oninput=()=>{
+        if(this.blocks[i].type==="list"){
+          this.blocks[i].items=[...editable.querySelectorAll("li")]
+            .map(li=>li.innerText);
+        }else{
+          this.blocks[i].content=editable.innerHTML;
+        }
+        this.saveAll();
+      };
+
+      editable.onkeydown=e=>{
+        if(e.key==="ArrowUp" && i>0){
+          document.querySelectorAll(".block")[i-1]
+            .querySelector("[contenteditable]").focus();
+        }
+        if(e.key==="ArrowDown" && i<this.blocks.length-1){
+          document.querySelectorAll(".block")[i+1]
+            .querySelector("[contenteditable]").focus();
+        }
+      };
+    });
+  }
+
+  exportJSON(){
+    const blob=new Blob(
+      [JSON.stringify(this.blocks,null,2)],
+      {type:"application/json"}
+    );
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=this.current+".json";
+    a.click();
+  }
+
+  exportHTML(){
+    const body=this.blocks.map(b=>{
+      if(b.type==="paragraph") return `<p>${b.content}</p>`;
+      if(b.type==="heading") return `<h${b.level}>${b.content}</h${b.level}>`;
+      if(b.type==="list") return `<ul>${b.items.map(li=>`<li>${li}</li>`).join("")}</ul>`;
+    }).join("\n");
+
+    const html=`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${this.current}</title>
+<style>
+body{font-family:system-ui;padding:40px;}
+</style>
+</head>
+<body>
+${body}
+</body>
+</html>`;
+
+    const blob=new Blob([html],{type:"text/html"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=this.current+".html";
+    a.click();
+  }
+
+}
+
+/* ================= THEME ================= */
+
+function toggleTheme(){
+  document.body.classList.toggle("dark");
+}
+
+/* ================= INIT ================= */
+
+const editor=new Editor();
+
+/* ================= OPTIONAL PWA ================= */
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+
+</script>
+</body>
+</html>
