@@ -1,42 +1,50 @@
 export class Renderer {
-
-  constructor(engine){
+  constructor(engine) {
     this.engine = engine;
   }
 
-  render(){
+  render() {
     const container = document.getElementById("app");
     container.innerHTML = this.renderNode(this.engine.doc.data);
   }
 
-  renderNode(node){
+  renderNode(node) {
 
-    if(node.type==="document"){
-      return node.children.map(n=>this.renderNode(n)).join("");
-    }
-
-    if(node.type==="chapter"){
+    if (node.type === "document") {
       return `
-        <div class="node">
-          <h1 contenteditable="true"
-            data-id="${node.id}">
-            ${node.title}
-          </h1>
-          ${node.children.map(n=>this.renderNode(n)).join("")}
+        <div class="topbar">
+          <strong>${node.meta.title}</strong>
+        </div>
+        <div class="layout">
+          <div class="sidebar">
+            ${this.engine.sidebar.render()}
+          </div>
+          <div class="canvas">
+            ${node.children.map(n => this.renderNode(n)).join("")}
+          </div>
         </div>
       `;
     }
 
-    if(node.type==="paragraph"){
+    if (node.type === "chapter") {
       return `
-        <p contenteditable="true"
-           data-id="${node.id}">
-           ${node.content}
+        <div class="node">
+          <h1 contenteditable="true" data-id="${node.id}">
+            ${node.title}
+          </h1>
+          ${node.children.map(n => this.renderNode(n)).join("")}
+        </div>
+      `;
+    }
+
+    if (node.type === "paragraph") {
+      return `
+        <p contenteditable="true" data-id="${node.id}">
+          ${node.content}
         </p>
       `;
     }
 
     return "";
   }
-
 }
