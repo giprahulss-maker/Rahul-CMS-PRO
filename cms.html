@@ -16,87 +16,74 @@ body{
 }
 
 /* ===== TOPBAR ===== */
-
-.wp-topbar{
+.topbar{
   height:60px;
   background:#fff;
+  border-bottom:1px solid #ddd;
   display:flex;
   align-items:center;
   justify-content:space-between;
   padding:0 20px;
-  border-bottom:1px solid #ddd;
 }
 
-.wp-topbar .left button{
-  font-size:18px;
-  background:none;
+.topbar input{
   border:none;
-  cursor:pointer;
-}
-
-.wp-topbar input{
-  border:none;
-  font-size:18px;
+  font-size:20px;
   font-weight:500;
-  text-align:center;
   outline:none;
   width:400px;
+  text-align:center;
 }
 
-.wp-topbar .right button{
+.topbar button{
   background:#0073aa;
+  color:white;
   border:none;
   padding:8px 14px;
-  color:white;
   border-radius:4px;
   cursor:pointer;
   margin-left:8px;
 }
 
-.wp-topbar .right button:hover{
-  background:#005177;
-}
-
 /* ===== LAYOUT ===== */
-
-.wp-layout{
+.layout{
   display:flex;
   height:calc(100vh - 60px);
 }
 
-/* ===== SIDEBAR ===== */
-
-.wp-sidebar{
-  width:260px;
-  background:#fff;
+/* ===== LEFT BLOCK PANEL ===== */
+.sidebar{
+  width:240px;
+  background:white;
   border-right:1px solid #ddd;
   padding:20px;
   overflow:auto;
 }
 
-.wp-sidebar h3{
-  margin-top:0;
-}
-
-.wp-sidebar button{
-  display:block;
+.sidebar button{
   width:100%;
-  margin-bottom:10px;
   padding:10px;
-  border:1px solid #ddd;
+  margin-bottom:8px;
   background:white;
-  cursor:pointer;
+  border:1px solid #ddd;
   text-align:left;
-  font-size:14px;
+  cursor:pointer;
 }
 
-.wp-sidebar button:hover{
+.sidebar button:hover{
   background:#f3f4f6;
 }
 
-/* ===== EDITOR AREA ===== */
+/* ===== RIGHT SETTINGS ===== */
+.settings{
+  width:260px;
+  background:white;
+  border-left:1px solid #ddd;
+  padding:20px;
+}
 
-.wp-editor{
+/* ===== EDITOR ===== */
+.editor-area{
   flex:1;
   background:#dcd2c2;
   display:flex;
@@ -105,61 +92,107 @@ body{
 }
 
 #gjs{
-  width:800px;
-  background:#dcd2c2;
+  width:780px;
   padding:60px 40px;
+  background:#dcd2c2;
   min-height:100%;
 }
 
-/* Remove Grapes default UI */
-.gjs-pn-panel{
-  display:none !important;
+/* Remove default grapes UI */
+.gjs-pn-panel{ display:none !important; }
+.gjs-cv-canvas{ background:#dcd2c2 !important; }
+
+/* Floating Toolbar */
+.floating-toolbar{
+  position:absolute;
+  background:#111;
+  color:white;
+  padding:6px 8px;
+  border-radius:6px;
+  display:none;
+  z-index:1000;
 }
-.gjs-cv-canvas{
-  background:#dcd2c2 !important;
+
+.floating-toolbar button{
+  background:none;
+  border:none;
+  color:white;
+  margin:0 5px;
+  cursor:pointer;
+}
+
+/* Slash Menu */
+.slash-menu{
+  position:absolute;
+  background:white;
+  border:1px solid #ddd;
+  padding:8px;
+  display:none;
+  z-index:1000;
+  width:200px;
+}
+.slash-menu div{
+  padding:6px;
+  cursor:pointer;
+}
+.slash-menu div:hover{
+  background:#f3f4f6;
 }
 </style>
 </head>
 
 <body>
 
-<div class="wp-topbar">
-  <div class="left">
-    <button onclick="toggleSidebar()">☰</button>
-  </div>
-
-  <div class="center">
-    <input type="text" id="docTitle" placeholder="Add title">
-  </div>
-
-  <div class="right">
-    <button onclick="saveContent()">Save</button>
-    <button onclick="exportPDF()">Publish</button>
+<div class="topbar">
+  <div>☰</div>
+  <input type="text" id="docTitle" placeholder="Add title">
+  <div>
+    <button onclick="save()">Save</button>
+    <button onclick="publish()">Publish</button>
   </div>
 </div>
 
-<div class="wp-layout">
+<div class="layout">
 
-  <div class="wp-sidebar" id="sidebar">
+  <!-- LEFT BLOCKS -->
+  <div class="sidebar">
     <h3>Blocks</h3>
-    <button onclick="addParagraph()">Paragraph</button>
-    <button onclick="addHeading()">Heading</button>
-    <button onclick="addSubHeading()">Sub Heading</button>
-    <button onclick="addImage()">Image</button>
-    <button onclick="addQuote()">Quote</button>
-    <button onclick="addList()">List</button>
-    <button onclick="addTable()">Table</button>
+    <button onclick="addBlock('p')">Paragraph</button>
+    <button onclick="addBlock('h2')">Heading</button>
+    <button onclick="addBlock('image')">Image</button>
+    <button onclick="addBlock('quote')">Quote</button>
+    <button onclick="addBlock('list')">List</button>
   </div>
 
-  <div class="wp-editor">
+  <!-- EDITOR -->
+  <div class="editor-area">
     <div id="gjs"></div>
   </div>
 
+  <!-- RIGHT SETTINGS -->
+  <div class="settings">
+    <h3>Block Settings</h3>
+    <label>Font Size</label>
+    <input type="range" min="14" max="40" onchange="changeFont(this.value)">
+  </div>
+
+</div>
+
+<!-- Floating Toolbar -->
+<div class="floating-toolbar" id="toolbar">
+  <button onclick="format('bold')"><b>B</b></button>
+  <button onclick="format('italic')"><i>I</i></button>
+  <button onclick="format('underline')"><u>U</u></button>
+</div>
+
+<!-- Slash Menu -->
+<div class="slash-menu" id="slashMenu">
+  <div onclick="addBlock('h2')">Heading</div>
+  <div onclick="addBlock('image')">Image</div>
+  <div onclick="addBlock('quote')">Quote</div>
 </div>
 
 <script>
-
-/* ===== INIT EDITOR ===== */
 
 const editor = grapesjs.init({
   container:'#gjs',
@@ -167,80 +200,78 @@ const editor = grapesjs.init({
   storageManager:false,
 });
 
-/* ===== BLOCK FUNCTIONS ===== */
+/* BLOCKS */
 
-function addParagraph(){
-  editor.addComponents(`<p>Start writing your content here...</p>`);
+function addBlock(type){
+  if(type==='p') editor.addComponents(`<p contenteditable="true">Start writing...</p>`);
+  if(type==='h2') editor.addComponents(`<h2 contenteditable="true">Heading</h2>`);
+  if(type==='image') editor.addComponents(`<img src="https://via.placeholder.com/700x300" style="max-width:100%">`);
+  if(type==='quote') editor.addComponents(`<blockquote contenteditable="true">Quote text...</blockquote>`);
+  if(type==='list') editor.addComponents(`<ul><li contenteditable="true">List item</li></ul>`);
 }
 
-function addHeading(){
-  editor.addComponents(`<h2>Heading</h2>`);
+/* SAVE */
+
+function save(){
+  localStorage.setItem("doc", editor.getHtml());
+  alert("Saved");
 }
 
-function addSubHeading(){
-  editor.addComponents(`<h3>Sub Heading</h3>`);
-}
-
-function addImage(){
-  editor.addComponents(`
-    <figure>
-      <img src="https://via.placeholder.com/700x350" style="max-width:100%">
-      <figcaption>Image caption</figcaption>
-    </figure>
-  `);
-}
-
-function addQuote(){
-  editor.addComponents(`<blockquote style="border-left:4px solid #999;padding-left:15px;">Quote text...</blockquote>`);
-}
-
-function addList(){
-  editor.addComponents(`<ul><li>List item</li></ul>`);
-}
-
-function addTable(){
-  editor.addComponents(`
-    <table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
-      <tr><th>Header 1</th><th>Header 2</th></tr>
-      <tr><td>Data</td><td>Data</td></tr>
-    </table>
-  `);
-}
-
-/* ===== SIDEBAR TOGGLE ===== */
-
-function toggleSidebar(){
-  const sidebar = document.getElementById("sidebar");
-  sidebar.style.display =
-    sidebar.style.display === "none" ? "block" : "none";
-}
-
-/* ===== SAVE ===== */
-
-function saveContent(){
-  const content = editor.getHtml();
-  const title = document.getElementById("docTitle").value;
-  localStorage.setItem("rahulDoc", JSON.stringify({title,content}));
-  alert("Saved successfully!");
-}
-
-/* ===== LOAD ON START ===== */
-
-window.onload = function(){
-  const saved = JSON.parse(localStorage.getItem("rahulDoc"));
-  if(saved){
-    document.getElementById("docTitle").value = saved.title;
-    editor.setComponents(saved.content);
-  }
-};
-
-/* ===== EXPORT PDF ===== */
-
-function exportPDF(){
-  const element = document.createElement("div");
-  element.innerHTML = `<h1>${document.getElementById("docTitle").value}</h1>` + editor.getHtml();
+function publish(){
+  const element=document.createElement("div");
+  element.innerHTML="<h1>"+document.getElementById("docTitle").value+"</h1>"+editor.getHtml();
   html2pdf().from(element).save("document.pdf");
 }
+
+/* FLOATING TOOLBAR */
+
+document.addEventListener("mouseup",function(e){
+  const selection=window.getSelection();
+  if(selection.toString().length>0){
+    const rect=selection.getRangeAt(0).getBoundingClientRect();
+    const toolbar=document.getElementById("toolbar");
+    toolbar.style.display="block";
+    toolbar.style.top=(rect.top-40)+"px";
+    toolbar.style.left=rect.left+"px";
+  } else {
+    document.getElementById("toolbar").style.display="none";
+  }
+});
+
+function format(cmd){
+  document.execCommand(cmd,false,null);
+}
+
+/* SLASH COMMAND */
+
+document.addEventListener("keydown",function(e){
+  if(e.key==="/"){
+    const menu=document.getElementById("slashMenu");
+    menu.style.display="block";
+    menu.style.top=(window.innerHeight/2)+"px";
+    menu.style.left=(window.innerWidth/2 - 100)+"px";
+  }
+});
+
+/* CHANGE FONT */
+
+function changeFont(size){
+  document.execCommand("fontSize",false,"7");
+  const fonts=document.getElementsByTagName("font");
+  for(let i=0;i<fonts.length;i++){
+    if(fonts[i].size=="7"){
+      fonts[i].removeAttribute("size");
+      fonts[i].style.fontSize=size+"px";
+    }
+  }
+}
+
+/* LOAD */
+
+window.onload=function(){
+  const saved=localStorage.getItem("doc");
+  if(saved) editor.setComponents(saved);
+};
 
 </script>
 
