@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rahul Block Engine</title>
+<style>
+body { margin:0; font-family:system-ui; background:#f5f5f5; }
+
+.topbar{
+  height:60px;
+  background:white;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+  border-bottom:1px solid #ddd;
+}
+
+.layout{
+  display:flex;
+  height:calc(100vh - 60px);
+}
+
+.sidebar{
+  width:220px;
+  background:white;
+  border-right:1px solid #ddd;
+  padding:10px;
+}
+
+.sidebar button{
+  width:100%;
+  margin-bottom:8px;
+  padding:8px;
+}
+
+.canvas{
+  flex:1;
+  padding:40px;
+  overflow:auto;
+}
+
+.block{
+  background:white;
+  padding:10px;
+  margin-bottom:10px;
+  border:1px solid transparent;
+}
+
+.block.selected{
+  border:1px solid #0073aa;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <strong>Rahul Block Engine</strong>
+  <div>
+    <button onclick="undo()">Undo</button>
+    <button onclick="redo()">Redo</button>
+    <button onclick="save()">Save</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <button onclick="editor.addBlock('paragraph')">Paragraph</button>
+    <button onclick="editor.addBlock('heading')">Heading</button>
+  </div>
+
+  <div class="canvas" id="canvas"></div>
+</div>
+
+<script>
+
+/* ===========================
+   BLOCK REGISTRY
+=========================== */
+
+const BlockRegistry = {
+  paragraph: {
+    create(data = { content: "New paragraph..." }) {
+      return { type:"paragraph", content:data.content };
+    },
+    render(block, index) {
+      return `<div class="block" data-index="${index}">
+        <p contenteditable="true">${block.content}</p>
+      </div>`;
+    }
+  },
+  heading: {
+    create(data = { content: "Heading", level:2 }) {
+      return { type:"heading", content:data.content, level:data.level };
+    },
+    render(block, index) {
+      return `<div class="block" data-index="${index}">
+        <h${block.level} contenteditable="true">${block.content}</h${block.level}>
+      </div>`;
+    }
+  }
+};
+
+/* ===========================
+   EDITOR ENGINE
+=========================== */
+
+class Editor {
+  constructor(){
+    this.blocks = [];
+    this.history = [];
+    this.future = [];
+  }
+
+  addBlock(type){
+    const block = BlockRegistry[type].create();
+    this.blocks.push(block);
+    this.saveHistory();
+    this.render();
+  }
+
+  render(){
+    const canvas = document.getElementById("canvas");
+    canvas.innerHTML = this.blocks
+      .map((b,i)=>BlockRegistry[b.type].render(b,i))
+      .join("");
+
+    this.attachEvents();
+  }
+
+  attachEvents(){
+    document.querySelectorAll(".block").forEach(el=>{
+      el.onclick = (e)=>{
+        document.querySelectorAll(".block")
+          .forEach(b=>b.classList.remove("selected"));
+        el.classList.add("selected");
+        e.stopPropagation();
+      };
+
+      const index = el.dataset.index;
+      const editable = el.querySelector("[contenteditable]");
+      editable.oninput = ()=>{
+        this.blocks[index].content = editable.innerText;
+      };
+    });
+  }
+
+  saveHistory(){
+    this.history.push(JSON.stringify(this.blocks));
+    if(this.history.length > 50) this.history.shift();
+  }
+
+  undo(){
+    if(this.history.length > 1){
+      this.future.push(this.history.pop());
+      this.blocks = JSON.parse(this.history[this.history.length-1]);
+      this.render();
+    }
+  }
+
+  redo(){
+    if(this.future.length){
+      const state = this.future.pop();
+      this.history.push(state);
+      this.blocks = JSON.parse(state);
+      this.render();
+    }
+  }
+
+  save(){
+    localStorage.setItem("rahul-engine", JSON.stringify(this.blocks));
+  }
+
+  load(){
+    const data = localStorage.getItem("rahul-engine");
+    if(data){
+      this.blocks = JSON.parse(data);
+      this.render();
+      this.saveHistory();
+    }
+  }
+}
+
+/* ===========================
+   INITIALIZE
+=========================== */
+
+const editor = new Editor();
+editor.load();
+
+function undo(){ editor.undo(); }
+function redo(){ editor.redo(); }
+function save(){ editor.save(); }
+
+</script>
+</body>
+</html>
