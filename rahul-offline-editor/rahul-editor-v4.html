@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rahul Offline Editor v4</title>
+
+<style>
+body{margin:0;font-family:system-ui;background:#f3f3f3;}
+
+.topbar{
+  height:60px;background:white;border-bottom:1px solid #ddd;
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+}
+.topbar input{font-size:18px;border:none;outline:none;width:300px;}
+.topbar button{padding:6px 12px;}
+
+.layout{display:flex;height:calc(100vh - 60px);}
+
+.sidebar{
+  width:220px;background:white;border-right:1px solid #ddd;
+  padding:10px;overflow:auto;
+}
+
+.canvas{flex:1;padding:40px;overflow:auto;}
+
+.settings{
+  width:220px;background:white;border-left:1px solid #ddd;
+  padding:10px;
+}
+
+.block{
+  background:white;padding:10px;margin-bottom:10px;
+  border:1px solid transparent;position:relative;
+}
+
+.block.selected{border:1px solid #0073aa;}
+
+.insert-btn{
+  text-align:center;
+  cursor:pointer;
+  color:#999;
+  margin:4px 0;
+}
+
+.slash-menu{
+  position:absolute;background:white;border:1px solid #ddd;
+  display:none;padding:5px;width:200px;
+}
+.slash-menu input{
+  width:100%;padding:5px;margin-bottom:5px;
+}
+.slash-menu div{
+  padding:5px;cursor:pointer;
+}
+.slash-menu div:hover{background:#eee;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <input id="docTitle" placeholder="Document Title">
+  <div>
+    <button onclick="editor.undo()">Undo</button>
+    <button onclick="editor.redo()">Redo</button>
+    <button onclick="downloadHTML()">Save as HTML</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <div class="sidebar">
+    <button onclick="editor.addBlock('paragraph')">+ Paragraph</button>
+    <button onclick="editor.addBlock('heading')">+ Heading</button>
+    <button onclick="editor.addBlock('list')">+ List</button>
+    <button onclick="editor.addBlock('image')">+ Image</button>
+  </div>
+
+  <div class="canvas" id="canvas"></div>
+
+  <div class="settings" id="settings">
+    <h4>Block Settings</h4>
+    <div id="settingsContent">Select a block</div>
+  </div>
+
+</div>
+
+<div class="slash-menu" id="slashMenu">
+  <input placeholder="Search block..." oninput="editor.filterSlash(this.value)">
+  <div data-type="paragraph">Paragraph</div>
+  <div data-type="heading">Heading</div>
+  <div data-type="list">List</div>
+  <div data-type="image">Image</div>
+</div>
+
+<script>
+
+/* ================= BLOCK REGISTRY ================= */
+
+const BlockRegistry={
+
+  paragraph:{
+    create(data={}){ return {type:"paragraph",content:data.content||""}; },
+    render(b,i){
+      return `<div class="block" data-index="${i}">
+        <p contenteditable="true">${b.content}</p>
+      </div>`;
+    }
+  },
+
+  heading:{
+    create(data={}){ return {type:"heading",level:data.level||2,content:data.content||"Heading"}; },
+    render(b,i){
+      return `<div class="block" data-index="${i}">
+        <h${b.level} contenteditable="true">${b.content}</h${b.level}>
+      </div>`;
+    }
+  },
+
+  list:{
+    create(data={}){ return {type:"list",items:data.items||["List item"]}; },
+    render(b,i){
+      return `<div class="block" data-index="${i}">
+        <ul contenteditable="true">
+          ${b.items.map(li=>`<li>${li}</li>`).join("")}
+        </ul>
+      </div>`;
+    }
+  },
+
+  image:{
+    create(data={}){ return {type:"image",src:data.src||""}; },
+    render(b,i){
+      return `<div class="block" data-index="${i}">
+        ${b.src?`<img src="${b.src}" style="max-width:100%">`
+        :`<input type="file" onchange="editor.uploadImage(event,${i})">`}
+      </div>`;
+    }
+  }
+
+};
+
+/* ================= EDITOR ================= */
+
+class Editor{
+
+  constructor(){
+    this.blocks=[];
+    this.history=[];
+    this.future=[];
+    this.selected=null;
+  }
+
+  saveState(){
+    this.history.push(JSON.stringify(this.blocks));
+    if(this.history.length>100) this.history.shift();
+    this.future=[];
+  }
+
+  undo(){
+    if(this.history.length){
+      this.future.push(JSON.stringify(this.blocks));
+      this.blocks=JSON.parse(this.history.pop());
+      this.render();
+    }
+  }
+
+  redo(){
+    if(this.future.length){
+      this.history.push(JSON.stringify(this.blocks));
+      this.blocks=JSON.parse(this.future.pop());
+      this.render();
+    }
+  }
+
+  addBlock(type,index=null){
+    this.saveState();
+    const block=BlockRegistry[type].create();
+    if(index===null) this.blocks.push(block);
+    else this.blocks.splice(index,0,block);
+    this.render();
+  }
+
+  uploadImage(e,i){
+    const reader=new FileReader();
+    reader.onload=()=>{
+      this.saveState();
+      this.blocks[i].src=reader.result;
+      this.render();
+    };
+    reader.readAsDataURL(e.target.files[0]);
+  }
+
+  render(){
+    const canvas=document.getElementById("canvas");
+    canvas.innerHTML=this.blocks.map((b,i)=>
+      `<div class="insert-btn" onclick="editor.addBlock('paragraph',${i})">＋</div>`+
+      BlockRegistry[b.type].render(b,i)
+    ).join("")+
+    `<div class="insert-btn" onclick="editor.addBlock('paragraph')">＋</div>`;
+
+    this.attachEvents();
+  }
+
+  attachEvents(){
+    document.querySelectorAll(".block").forEach(el=>{
+      const i=el.dataset.index;
+      el.onclick=(e)=>{
+        this.selected=i;
+        document.querySelectorAll(".block")
+          .forEach(b=>b.classList.remove("selected"));
+        el.classList.add("selected");
+        this.showSettings();
+        e.stopPropagation();
+      };
+
+      const editable=el.querySelector("[contenteditable]");
+      if(editable){
+        editable.oninput=()=>{
+          if(this.blocks[i].type==="list"){
+            this.blocks[i].items=[...editable.querySelectorAll("li")]
+              .map(li=>li.innerText);
+          }else{
+            this.blocks[i].content=editable.innerHTML;
+          }
+        };
+
+        editable.onkeydown=(e)=>{
+          if(e.key==="Enter" && this.blocks[i].type==="paragraph"){
+            e.preventDefault();
+            this.addBlock("paragraph",parseInt(i)+1);
+          }
+
+          if(e.key==="/"){
+            slashMenu.style.display="block";
+            slashMenu.style.top=e.pageY+"px";
+            slashMenu.style.left=e.pageX+"px";
+          }
+        };
+      }
+    });
+  }
+
+  showSettings(){
+    const s=document.getElementById("settingsContent");
+    const b=this.blocks[this.selected];
+    if(!b){ s.innerHTML="Select a block"; return; }
+
+    if(b.type==="heading"){
+      s.innerHTML=`
+        <label>Heading Level</label>
+        <select onchange="editor.changeLevel(this.value)">
+          ${[1,2,3,4,5,6].map(n=>
+            `<option ${b.level==n?"selected":""}>${n}</option>`
+          ).join("")}
+        </select>`;
+    }else{
+      s.innerHTML="No settings available";
+    }
+  }
+
+  changeLevel(level){
+    this.saveState();
+    this.blocks[this.selected].level=level;
+    this.render();
+  }
+
+  filterSlash(value){
+    document.querySelectorAll("#slashMenu div").forEach(d=>{
+      d.style.display=d.innerText.toLowerCase()
+        .includes(value.toLowerCase())?"block":"none";
+    });
+  }
+
+}
+
+/* ================= EXPORT ================= */
+
+function downloadHTML(){
+  const body=editor.blocks.map(b=>{
+    if(b.type==="paragraph") return `<p>${b.content}</p>`;
+    if(b.type==="heading") return `<h${b.level}>${b.content}</h${b.level}>`;
+    if(b.type==="list") return `<ul>${b.items.map(i=>`<li>${i}</li>`).join("")}</ul>`;
+    if(b.type==="image") return `<img src="${b.src}">`;
+  }).join("\n");
+
+  const html=`<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8">
+<title>${docTitle.value}</title>
+<style>body{font-family:system-ui;padding:40px;}</style>
+</head>
+<body>
+<h1>${docTitle.value}</h1>
+${body}
+</body>
+</html>`;
+
+  const blob=new Blob([html],{type:"text/html"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="document.html";
+  a.click();
+}
+
+/* ================= INIT ================= */
+
+const editor=new Editor();
+
+document.querySelectorAll("#slashMenu div").forEach(d=>{
+  d.onclick=()=>{
+    editor.addBlock(d.dataset.type);
+    slashMenu.style.display="none";
+  };
+});
+
+</script>
+</body>
+</html>
